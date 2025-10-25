@@ -1,4 +1,4 @@
-NAME := main
+NAME := 3020-keyboard
 
 # Paths
 PROJECT_DIR := $(CURDIR)
