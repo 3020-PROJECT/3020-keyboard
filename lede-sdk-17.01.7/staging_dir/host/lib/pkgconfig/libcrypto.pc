@@ -1,0 +1,15 @@
+#libcrypto pkg-config source file
+
+prefix=/build/lede-17.01/slaves/phase1/ar71xx_generic/build/staging_dir/host
+exec_prefix=/build/lede-17.01/slaves/phase1/ar71xx_generic/build/staging_dir/host
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: LibreSSL-libcrypto
+Description: LibreSSL cryptography library
+Version: 2.5.4
+Requires:
+Conflicts:
+Libs: -L${libdir} -lcrypto
+Libs.private: -lresolv  
+Cflags: -I${includedir}

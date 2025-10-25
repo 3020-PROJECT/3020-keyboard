@@ -1,0 +1,16 @@
+#libtls pkg-config source file
+
+prefix=/build/lede-17.01/slaves/phase1/ar71xx_generic/build/staging_dir/host
+exec_prefix=/build/lede-17.01/slaves/phase1/ar71xx_generic/build/staging_dir/host
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: LibreSSL-libtls
+Description: Secure communications using the TLS socket protocol.
+Version: 2.5.4
+Requires:
+Requires.private: libcrypto libssl
+Conflicts:
+Libs: -L${libdir} -ltls
+Libs.private: -lresolv  -lcrypto -lssl 
+Cflags: -I${includedir}
