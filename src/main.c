@@ -4,28 +4,69 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
+#include <linux/input.h>
+#include <arpa/inet.h>
 
 
 /*
-    - connect to the esp-displayer
-    - identify as 3020-NANO
-    - execute the stty command to change the baudrate to 9600
-    - open /dev/ttyATH0 for both reading and writing.
-    - open /dev/input/event0 for reading.
-    - open socket with the esp32
-    - use poll to not block the IO operations.
-    - read from the keyboard and send for both the esp32 and the nano.
-    - for the esp32 I need to attach a '/print ' first.
-    - everything will be lowercase for now.
+    - [X] connect to the esp-displayer
+    - [X] identify as 3020-NANO
+    - [X] change the baudrate to 9600
+    - [X] open /dev/ttyATH0 for both reading and writing.
+    - [X] open /dev/input/event0 for reading.
+    - [X] open socket with the esp32
+    - [] use poll to not block the IO operations.
+    - [] read from the keyboard and send for both the esp32 and the nano.
+    - [X] for the esp32 I need to attach a '/print ' first.
+    - [] everything will be lowercase for now.
 */
+
+const char keymap[256] = {
+    [KEY_A]='a', [KEY_B]='b', [KEY_C]='c', [KEY_D]='d',
+    [KEY_E]='e', [KEY_F]='f', [KEY_G]='g', [KEY_H]='h',
+    [KEY_I]='i', [KEY_J]='j', [KEY_K]='k', [KEY_L]='l',
+    [KEY_M]='m', [KEY_N]='n', [KEY_O]='o', [KEY_P]='p',
+    [KEY_Q]='q', [KEY_R]='r', [KEY_S]='s', [KEY_T]='t',
+    [KEY_U]='u', [KEY_V]='v', [KEY_W]='w', [KEY_X]='x',
+    [KEY_Y]='y', [KEY_Z]='z',
+    [KEY_1]='1', [KEY_2]='2', [KEY_3]='3', [KEY_4]='4',
+    [KEY_5]='5', [KEY_6]='6', [KEY_7]='7', [KEY_8]='8',
+    [KEY_9]='9', [KEY_0]='0',
+    [KEY_ENTER]='\n', [KEY_SPACE]=' ',
+    [KEY_DOT]='.', [KEY_COMMA]=',',
+    [KEY_MINUS]='-', [KEY_EQUAL]='=',
+    [KEY_BACKSPACE]='\b'
+};
 
 void    exitWithError(char *error){
     perror(error);
     exit(1);
 }
 
-int connectToDisplay(char *display_ip, char *display_port){
-    return -1;
+int connectToDisplay(char *display_ip, int  display_port){
+    int sock;
+    struct sockaddr_in serv_addr;
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sock < 0)
+        exitWithError("Socket");
+     memset(&serv_addr, 0, sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(display_port);
+    if (inet_pton(AF_INET, display_ip, &serv_addr.sin_addr) <= 0){
+        close(sock);
+        exitWithError("inet_pton");
+    }
+    if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0){
+        close(sock);
+        exitWithError("connect");
+    }
+
+    write(sock, "/print Hello Test\n", 18);
+    write(sock, "/identify 3020-ROUTER\n", 22);
+    return sock;
 }
 
 int openSerialCommunication(void){
@@ -81,24 +122,41 @@ int openkeyboardEvent(void){
     return fd;
 }
 
+char    readKey(int fd){
+    struct input_event ev;
+    if (read(fd, &ev, sizeof(ev)) == sizeof(ev)) {
+        if (ev.type == EV_KEY && ev.value == 1) {
+            char c = keymap[ev.code];
+            return c;
+        }
+    }
+    return -1;
+}
+
 int main(int ac, char **av){
     int serial;
-    // int displayServer;
-    // int kbd;
+    int displayServer;
+    int kbd;
     
     if (ac != 3)
         return fprintf(stderr, "usage: ./%s [display-ip] [display-port]\n", av[0]);
     
-    // displayServer = connectToDisplay(av[0], av[1]);
+    displayServer = connectToDisplay(av[1], atoi(av[2]));
     serial = openSerialCommunication();
+    kbd = openkeyboardEvent();
 
-    write(serial,"pinmode 12 output\n", 18);
-    while (1) {
-        write(serial,"write 12 high\n", 14);
-        sleep(1);
-        write(serial,"write 12 low\n", 13);
-        sleep(1);
+    write(displayServer, "/print ", 7);
+    while (1337) {
+        char c = readKey(kbd);
+        if (c > 0){
+            write(1, &c, 1);
+            write(serial, &c, 1);
+            write(displayServer, &c, 1);
+            if (c == '\n')
+                write(displayServer, "/print ", 7);
+        }
     }
     close(serial);
-    // kbd = openKeyboardEvent();
+    close(displayServer);
+    close(kbd);
 }
