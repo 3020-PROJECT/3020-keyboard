@@ -89,7 +89,7 @@ If you press Enter, the display automatically starts a new `/print` line.
 - Reads input events from Linux’s **evdev** subsystem (`/dev/input/event0`)  
 - Sends initial handshake:
   ```
-  /print Hello Test
+  /print Hello From 3020-Keyboard!
   /identify 3020-ROUTER
   ```
 - Currently blocking I/O — `poll()` support planned for non-blocking read/write  
@@ -97,7 +97,7 @@ If you press Enter, the display automatically starts a new `/print` line.
 ---
 
 ## 🚧 TODO
-- [ ] Use `poll()` to handle I/O without blocking  
+- [X] Use `poll()` to handle I/O without blocking  
 - [ ] Support uppercase and special keys  
 - [ ] Implement a clean exit signal (e.g. Ctrl+C handler)  
 - [ ] Optional visual feedback or command mode  

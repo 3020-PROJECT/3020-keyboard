@@ -5,6 +5,7 @@
 #include <string.h>
 #include <termios.h>
 #include <linux/input.h>
+#include <poll.h>
 #include <arpa/inet.h>
 
 
@@ -20,6 +21,12 @@
     - [X] for the esp32 I need to attach a '/print ' first.
     - [] everything will be lowercase for now.
 */
+
+#define SERIAL_INDEX    0
+#define SOCKET_INDEX    1
+#define KEYBOARD_INDEX  2
+#define MAX_FDS         3
+#define MAX_BUFF_SIZE   512
 
 const char keymap[256] = {
     [KEY_A]='a', [KEY_B]='b', [KEY_C]='c', [KEY_D]='d',
@@ -37,6 +44,16 @@ const char keymap[256] = {
     [KEY_MINUS]='-', [KEY_EQUAL]='=',
     [KEY_BACKSPACE]='\b'
 };
+
+typedef struct buffer
+{
+    char s[512];
+    uint8_t index;
+    uint8_t size;
+}_buffer;
+
+_buffer serial_buffer;
+_buffer display_buffer;
 
 void    exitWithError(char *error){
     perror(error);
@@ -64,8 +81,6 @@ int connectToDisplay(char *display_ip, int  display_port){
         exitWithError("connect");
     }
 
-    write(sock, "/print Hello Test\n", 18);
-    write(sock, "/identify 3020-ROUTER\n", 22);
     return sock;
 }
 
@@ -108,7 +123,7 @@ int openSerialCommunication(void){
         exitWithError("unable to set the /dev/ttyATH0 tty settings");
     }
 
-    printf("Serial port configured to 9600 baud, raw, no echo\n");
+    printf("Serial port configured to 9600 baud, raw, no echo; FD= %d\n", fd);
 
     return fd;
 }
@@ -122,21 +137,107 @@ int openkeyboardEvent(void){
     return fd;
 }
 
+void    appendChar(_buffer *buff, char c){
+    if (buff->size > MAX_BUFF_SIZE - 1)
+        return ; // can't do more
+    buff->s[buff->size] = c;
+    buff->s[buff->size + 1] = 0;
+    buff->size += 1;
+}
+
+void    appendStr(_buffer *buff, char *s){
+    while ((buff->size < MAX_BUFF_SIZE - 1) && *s) {
+        buff->s[buff->size] = *s;
+        s++, buff->size++;
+    }
+    buff->s[buff->size] = '\0';
+}
+
 char    readKey(int fd){
     struct input_event ev;
     if (read(fd, &ev, sizeof(ev)) == sizeof(ev)) {
         if (ev.type == EV_KEY && ev.value == 1) {
             char c = keymap[ev.code];
-            return c;
+            if (c){
+                appendChar(&serial_buffer, c); 
+                appendChar(&display_buffer, c);
+                return c;
+            }
         }
     }
     return -1;
 }
 
+void    sendBufferToSocket(int sock_fd){
+    int     ret, size;
+    char *buff_start;
+
+    buff_start = &display_buffer.s[display_buffer.index];
+    if (display_buffer.index == display_buffer.size)
+        return ;
+    size = strlen(buff_start);
+
+    ret = send(sock_fd, buff_start, size, 0);
+    if (ret < 0)
+        return ;
+    if (buff_start[ret - 1] == '\n'){
+        display_buffer.size = 0;
+        display_buffer.index = 0;
+        appendStr(&display_buffer, "/print ");
+    }
+    else
+        display_buffer.index += ret;
+}
+
+
+void    sendBufferToSerial(int sock_fd){
+    int     ret, size;
+    char *buff_start;
+
+
+    buff_start = &serial_buffer.s[serial_buffer.index];
+    if (serial_buffer.index == serial_buffer.size)
+        return ;
+    size = strlen(buff_start);
+
+    ret = write(sock_fd, buff_start, size);
+    if (ret < 0)
+        return ;
+    if (buff_start[ret - 1] == '\n'){
+        serial_buffer.size = 0;
+        serial_buffer.index = 0;
+    }
+    else
+        serial_buffer.index += ret;
+}
+
+void    pollEvents(struct pollfd *fds) {
+    int ret = poll(fds, MAX_FDS, -1); // wait indefinitely
+
+    if (ret < 0)
+        return perror("POLL FAILED");
+
+    // Check socket events
+    if (fds[SOCKET_INDEX].revents & POLLOUT) {
+        sendBufferToSocket(fds[SOCKET_INDEX].fd);
+    }
+
+    // // Check serial input
+    // if (fds[SERIAL_INDEX].revents & POLLIN) {
+        
+    // }
+
+    // Check serial output ready
+    if (fds[SERIAL_INDEX].revents & POLLOUT)
+        sendBufferToSerial(fds[SERIAL_INDEX].fd);
+
+    // Check keyboard input
+    if (fds[KEYBOARD_INDEX].revents & POLLIN)
+        readKey(fds[KEYBOARD_INDEX].fd);
+}
+
 int main(int ac, char **av){
-    int serial;
-    int displayServer;
-    int kbd;
+    int serial, displayServer, kbd;
     
     if (ac != 3)
         return fprintf(stderr, "usage: ./%s [display-ip] [display-port]\n", av[0]);
@@ -144,18 +245,17 @@ int main(int ac, char **av){
     displayServer = connectToDisplay(av[1], atoi(av[2]));
     serial = openSerialCommunication();
     kbd = openkeyboardEvent();
-
-    write(displayServer, "/print ", 7);
-    while (1337) {
-        char c = readKey(kbd);
-        if (c > 0){
-            write(1, &c, 1);
-            write(serial, &c, 1);
-            write(displayServer, &c, 1);
-            if (c == '\n')
-                write(displayServer, "/print ", 7);
-        }
-    }
+    
+    struct pollfd fds[MAX_FDS] = {
+        [SOCKET_INDEX] = { displayServer,   POLLOUT, 0 },   // socket: only read
+        [SERIAL_INDEX] = { serial, POLLIN | POLLOUT, 0 },   // serial: read + write
+        [KEYBOARD_INDEX] = { kbd,   POLLIN, 0 }             // control: keyboard input
+    };
+    
+    appendStr(&display_buffer, "/print Hello From 3020-Keyboard!\n/identify 3020-ROUTER\n/print ");
+    while (1337)
+        pollEvents(fds);
+    
     close(serial);
     close(displayServer);
     close(kbd);
