@@ -16,10 +16,10 @@
     - [X] open /dev/ttyATH0 for both reading and writing.
     - [X] open /dev/input/event0 for reading.
     - [X] open socket with the esp32
-    - [] use poll to not block the IO operations.
-    - [] read from the keyboard and send for both the esp32 and the nano.
+    - [X] use poll to not block the IO operations.
+    - [X] read from the keyboard and send for both the esp32 and the nano.
     - [X] for the esp32 I need to attach a '/print ' first.
-    - [] everything will be lowercase for now.
+    - [X] everything will be lowercase for now.
 */
 
 #define SERIAL_INDEX    0
