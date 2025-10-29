@@ -106,8 +106,7 @@ If you press Enter, the display automatically starts a new `/print` line.
 
 ## 🤝 Related Projects
 - 🖥️ **[ESP-VGA-Displayer](https://github.com/0rayn/esp-vga-displayer)** — the TCP display server for this keyboard  
-- ⚙️ **Nano Firmware** — receives serial commands and executes actions  
-
+- 🖥️ **[3020-NANO](https://github.com/3020-PROJECT/3020-NANO)** — receives serial commands and executes actions 
 ---
 
 ## 🧩 License
