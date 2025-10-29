@@ -97,10 +97,10 @@ If you press Enter, the display automatically starts a new `/print` line.
 ---
 
 ## 🚧 TODO
-- [X] Use `poll()` to handle I/O without blocking  
-- [ ] Support uppercase and special keys  
-- [ ] Implement a clean exit signal (e.g. Ctrl+C handler)  
-- [ ] Optional visual feedback or command mode  
+- [X] Use `poll()` to handle I/O without blocking.
+- [ ] Implement a clean exit signal (e.g. Ctrl+C handler).
+- [ ] Optional visual feedback or command mode.
+- [ ] Allow toggling print mode on/off via a key combo.
 
 ---
 
